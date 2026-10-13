@@ -10,8 +10,13 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     py -3.11 -m venv .venv
 }
 
-& $VenvPython -c "import numpy" 2>$null
-if ($LASTEXITCODE -ne 0) {
+$PreviousErrorPreference = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
+& $VenvPython -c "import numpy" *> $null
+$HasNumpy = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $PreviousErrorPreference
+
+if (-not $HasNumpy) {
     Write-Host "Installing NumPy (first run only)..." -ForegroundColor Cyan
     & $VenvPython -m pip install --disable-pip-version-check -r requirements.txt
 }
