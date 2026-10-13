@@ -1,0 +1,12 @@
+{
+  "max_words": 20000,
+  "max_len": 40,
+  "threshold": 0.5,
+  "labels": {
+    "0": "Not sarcastic",
+    "1": "Sarcastic"
+  },
+  "runtime": "numpy",
+  "architecture": "Embedding 128 -> Bidirectional LSTM 64 -> Dense 64 -> Sigmoid",
+  "parameter_count": 2667137
+}

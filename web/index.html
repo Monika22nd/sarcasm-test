@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSTM Sarcasm Detector</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070a12; --card:#101728; --line:#263550; --text:#edf3ff;
+      --muted:#9babc6; --cyan:#43c9ff; --amber:#ffb13b; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; font:16px/1.55 Inter,Segoe UI,sans-serif; color:var(--text);
+      background:radial-gradient(circle at 18% 3%,#1b2a49 0,#0b1020 35%,var(--bg) 72%); }
+    main { width:min(920px,92vw); margin:auto; padding:56px 0 70px; }
+    .tag { color:var(--cyan); letter-spacing:.14em; text-transform:uppercase; font-size:.76rem; font-weight:800; }
+    h1 { font-size:clamp(2.5rem,8vw,5.4rem); line-height:.98; margin:14px 0 18px; letter-spacing:-.055em; }
+    .lead { color:var(--muted); font-size:1.08rem; max-width:650px; margin-bottom:32px; }
+    .grid { display:grid; grid-template-columns:1fr 270px; gap:18px; }
+    .card { background:linear-gradient(150deg,rgba(19,29,50,.94),rgba(10,15,27,.94)); border:1px solid var(--line);
+      border-radius:22px; padding:24px; box-shadow:0 22px 60px #0007; }
+    textarea { width:100%; min-height:145px; resize:vertical; padding:16px; border-radius:14px; border:1px solid #31415e;
+      background:#080d18; color:var(--text); font:inherit; outline:none; }
+    textarea:focus { border-color:var(--cyan); box-shadow:0 0 0 3px #43c9ff20; }
+    .examples { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 20px; }
+    .example { border:1px solid #344564; color:#c2d0e8; background:#111a2c; border-radius:999px; padding:7px 11px;
+      cursor:pointer; font-size:.78rem; }
+    .example:hover { border-color:var(--cyan); color:white; }
+    .range-row { display:flex; justify-content:space-between; align-items:center; margin:10px 0 7px; color:var(--muted); }
+    input[type=range] { width:100%; accent-color:var(--cyan); }
+    .analyze { width:100%; border:0; border-radius:13px; margin-top:18px; padding:13px 18px; cursor:pointer;
+      color:#00111a; background:linear-gradient(90deg,#43c9ff,#83f5d0); font-weight:850; font-size:1rem; }
+    .analyze:disabled { opacity:.55; cursor:wait; }
+    .result { display:none; margin-top:18px; padding:18px; border:1px solid var(--line); border-radius:15px; background:#090f1c; }
+    .result.show { display:block; }
+    .result h2 { margin:2px 0 5px; font-size:1.65rem; }
+    .bar { height:10px; background:#1e293b; border-radius:99px; overflow:hidden; margin-top:13px; }
+    .fill { height:100%; width:0; background:var(--cyan); transition:width .55s ease; }
+    dl { margin:0; } dt { color:var(--muted); font-size:.78rem; margin-top:18px; } dd { margin:3px 0; font-weight:750; }
+    .runtime { margin-top:23px; padding:12px; color:#9df3d0; background:#0c2a25; border:1px solid #1c5447; border-radius:12px; }
+    footer { color:#72819a; margin-top:18px; font-size:.82rem; text-align:center; }
+    @media(max-width:720px) { main{padding-top:35px}.grid{grid-template-columns:1fr}.model{order:-1} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="tag">Bidirectional LSTM · Local demo</div>
+  <h1>Is it<br>sarcasm?</h1>
+  <p class="lead">Enter an English headline or comment. The trained LSTM runs entirely on your computer with a lightweight NumPy inference engine.</p>
+  <div class="grid">
+    <section class="card">
+      <label for="text"><strong>Sentence</strong></label>
+      <div class="examples" id="examples"></div>
+      <textarea id="text" placeholder="Great, another meeting that could have been an email"></textarea>
+      <div class="range-row"><span>Decision threshold</span><strong id="thresholdValue">0.50</strong></div>
+      <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
+      <button class="analyze" id="analyze">Analyze sentence</button>
+      <div class="result" id="result">
+        <small style="color:var(--muted)">Prediction</small>
+        <h2 id="label"></h2>
+        <div id="probability"></div>
+        <div class="bar"><div class="fill" id="fill"></div></div>
+      </div>
+    </section>
+    <aside class="card model">
+      <div class="tag">Model details</div>
+      <dl>
+        <dt>Architecture</dt><dd>Embedding → BiLSTM → Dense</dd>
+        <dt>Vocabulary</dt><dd>20,000 words</dd>
+        <dt>Maximum length</dt><dd>40 tokens</dd>
+        <dt>Parameters</dt><dd>2,667,137</dd>
+      </dl>
+      <div class="runtime">✓ NumPy runtime<br><small>No TensorFlow or web framework</small></div>
+    </aside>
+  </div>
+  <footer>Learning demo · Trained for English · Predictions can be wrong</footer>
+</main>
+<script>
+  const samples = [
+    "Scientists discover that sleeping all day is the key to success",
+    "The government announced a new education program",
+    "Great, another meeting that could have been an email",
+    "Local students win the national science competition"
+  ];
+  const text = document.querySelector('#text');
+  const threshold = document.querySelector('#threshold');
+  const button = document.querySelector('#analyze');
+  const result = document.querySelector('#result');
+  samples.forEach((sample, index) => {
+    const chip = document.createElement('button'); chip.className='example'; chip.textContent=`Example ${index+1}`;
+    chip.title=sample; chip.onclick=()=>{text.value=sample; text.focus()};
+    document.querySelector('#examples').appendChild(chip);
+  });
+  threshold.oninput=()=>document.querySelector('#thresholdValue').textContent=Number(threshold.value).toFixed(2);
+  button.onclick=async()=>{
+    if(!text.value.trim()){text.focus();return}
+    button.disabled=true; button.textContent='Analyzing…'; result.classList.remove('show');
+    try {
+      const response=await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:text.value,threshold:Number(threshold.value)})});
+      const data=await response.json(); if(!response.ok) throw new Error(data.error||'Prediction failed');
+      const sarcastic=data.label==='Sarcastic', pct=data.probability*100;
+      const label=document.querySelector('#label'); label.textContent=(sarcastic?'🎭 ':'📰 ')+data.label;
+      label.style.color=sarcastic?'var(--amber)':'var(--cyan)';
+      document.querySelector('#probability').textContent=`Sarcasm probability: ${pct.toFixed(2)}%`;
+      const fill=document.querySelector('#fill'); fill.style.background=sarcastic?'var(--amber)':'var(--cyan)'; fill.style.width=`${pct}%`;
+      result.classList.add('show');
+    } catch(error) { alert(error.message); }
+    finally { button.disabled=false; button.textContent='Analyze sentence'; }
+  };
+  text.addEventListener('keydown',event=>{if(event.ctrlKey&&event.key==='Enter')button.click()});
+</script>
+</body>
+</html>
